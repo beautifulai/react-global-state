@@ -1,5 +1,35 @@
 import * as React from "react";
 
+export class ProviderNotRenderedError extends Error { }
+
+export class GlobalStateController<State, ProviderProps extends JSX.IntrinsicAttributes> {
+    protected _globalState: GlobalState<State, ProviderProps>;
+
+    constructor(initialState: State) {
+        this._globalState = new GlobalState<State, ProviderProps>(initialState);
+    }
+
+    protected get _state() {
+        return this._globalState.state;
+    }
+
+    protected get _providerProps() {
+        return this._globalState.providerProps;
+    }
+
+    protected _updateState(stateUpdate: (((state: State) => State) | Partial<State>)) {
+        return this._globalState.updateState(stateUpdate);
+    }
+
+    public withProvider(Component: React.FC<ProviderProps>) {
+        return this._globalState.withProvider(Component);
+    }
+
+    public withState(Component: React.FC<ProviderProps>) {
+       return this._globalState.withState(Component);
+    }
+}
+
 export default class GlobalState<State, ProviderProps extends JSX.IntrinsicAttributes> {
     private _state: State;
     private _reactContext: React.Context<State>;
@@ -10,8 +40,12 @@ export default class GlobalState<State, ProviderProps extends JSX.IntrinsicAttri
     /**
      * Provider props is *NOT* mutation-safe!
      */
-    public get providerProps(): ProviderProps | object {
-        return this._providerProps ?? {};
+    public get providerProps(): ProviderProps {
+        if (this._providerProps === null) {
+            throw new ProviderNotRenderedError("Provider props missing, provider not rendered");
+        }
+
+        return this._providerProps;
     }
 
     /**
@@ -64,11 +98,11 @@ export default class GlobalState<State, ProviderProps extends JSX.IntrinsicAttri
         return (props: ProviderProps) => (<Consumer>{state => <Component {...props} {...state} />}</Consumer>);
     }
 
-    public updateState(stateUpdate: ((state: State) => State | State)) {
+    public updateState(stateUpdate: (((state: State) => State) | Partial<State>)) {
         if (typeof stateUpdate === "function") {
             this._state = stateUpdate(this._state);
         } else {
-            this._state = { ...this._state, ...(stateUpdate as State) };
+            this._state = { ...this._state, ...(stateUpdate as Partial<State>) };
         }
 
         if (this._refreshProvider) {
