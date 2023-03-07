@@ -1,3 +1,5 @@
+import * as React from "react";
+
 import GlobalState from "./GlobalState";
 
 class GlobalStateController<State> {
@@ -15,11 +17,11 @@ class GlobalStateController<State> {
         return this._globalState.updateState(stateUpdate);
     }
 
-    public withProvider(Component: React.FC<JSX.IntrinsicAttributes>) {
+    public withProvider(Component: typeof React.Component<any, any>) {
         return this._globalState.withProvider(Component);
     }
 
-    public withState(Component: React.FC<JSX.IntrinsicAttributes>) {
+    public withState(Component: typeof React.Component<any, any>) {
         return this._globalState.withState(Component);
     }
 }

@@ -5,13 +5,13 @@ import { OnlyOneProviderAllowedError } from "./errors";
 class GlobalState<State> {
     private _state: State;
     private _reactContext: React.Context<State>;
-    private _refreshProvider: (() => void) | null;
+    private _refreshProvider: (() => Promise<void>) | null;
     private _hasProvider: boolean;
 
     /**
      * State is *NOT* mutation-safe!
      */
-    public get state(): State {
+    public get state() {
         return this._state;
     }
 
@@ -25,37 +25,42 @@ class GlobalState<State> {
         this._hasProvider = false;
     }
 
-    public withProvider(Component: React.FC<JSX.IntrinsicAttributes>) {
+    public withProvider(Component: typeof React.Component<any, any>) {
         if (this._hasProvider) {
             throw new OnlyOneProviderAllowedError("Only one provider is allowed");
         }
 
         this._hasProvider = true;
-        return (props: JSX.IntrinsicAttributes) => {
-            const [stateKey, updateStateKey] = React.useState(0);
 
-            // This has to go right on render so it's available for the children
-            // using global state on their first mount (before the useEffect is fired)
-            this._refreshProvider = () => updateStateKey(stateKey + 1);
+        return (props: React.ComponentProps<typeof Component>) => {
+            const [stateKey, updateStateKey] = React.useState(0);
+            const stateUpdateResolvers = React.useRef<Array<(() => void)>>([]);
 
             React.useEffect(() => {
-                // Only using for correct disposal upon unmount
+                stateUpdateResolvers.current.forEach(resolve => resolve());
+                stateUpdateResolvers.current = [];
+
+                this._refreshProvider = () => new Promise(resolve => {
+                    stateUpdateResolvers.current.push(resolve);
+                    updateStateKey(stateKey + 1);
+                });
+
                 return () => {
                     this._refreshProvider = null;
                 };
-            }, [0]);
+            }, [stateKey]);
 
             const { Provider } = this._reactContext;
             return <Provider value={this._state}><Component {...props} /></Provider>;
         }
     }
 
-    public withState(Component: React.FC<JSX.IntrinsicAttributes>) {
+    public withState(Component: typeof React.Component<any, any>) {
         const { Consumer } = this._reactContext;
-        return (props: JSX.IntrinsicAttributes) => (<Consumer>{state => <Component {...props} {...state} />}</Consumer>);
+        return (props: React.ComponentProps<typeof Component>) => (<Consumer>{state => <Component {...props} {...state} />}</Consumer>);
     }
 
-    public updateState(stateUpdate: (((state: State) => State) | Partial<State>)) {
+    public async updateState(stateUpdate: (((state: State) => State) | Partial<State>)) {
         if (typeof stateUpdate === "function") {
             this._state = stateUpdate(this._state);
         } else {
@@ -63,7 +68,7 @@ class GlobalState<State> {
         }
 
         if (this._refreshProvider) {
-            this._refreshProvider();
+            await this._refreshProvider();
         }
     }
 }
