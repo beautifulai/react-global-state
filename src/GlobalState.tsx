@@ -1,12 +1,10 @@
 import * as React from "react";
-
-import { OnlyOneProviderAllowedError } from "./errors";
+import { v4 as uuid } from "uuid";
 
 class GlobalState<State> {
     private _state: State;
     private _reactContext: React.Context<State>;
-    private _refreshProvider: (() => Promise<void>) | null;
-    private _hasProvider: boolean;
+    private _refreshProviderCollection: Record<string, () => Promise<void>>;
 
     /**
      * State is *NOT* mutation-safe!
@@ -21,16 +19,11 @@ class GlobalState<State> {
     constructor(initialState: State) {
         this._state = initialState;
         this._reactContext = React.createContext(initialState);
-        this._refreshProvider = null;
-        this._hasProvider = false;
+        this._refreshProviderCollection = {};
     }
 
     public withProvider(Component: typeof React.Component<any, any>) {
-        if (this._hasProvider) {
-            throw new OnlyOneProviderAllowedError("Only one provider is allowed");
-        }
-
-        this._hasProvider = true;
+        const providerWrapperId = uuid();
 
         return (props: React.ComponentProps<typeof Component>) => {
             const [stateKey, updateStateKey] = React.useState(0);
@@ -40,13 +33,13 @@ class GlobalState<State> {
                 stateUpdateResolvers.current.forEach(resolve => resolve());
                 stateUpdateResolvers.current = [];
 
-                this._refreshProvider = () => new Promise(resolve => {
+                this._refreshProviderCollection[providerWrapperId] = () => new Promise(resolve => {
                     stateUpdateResolvers.current.push(resolve);
                     updateStateKey(stateKey + 1);
                 });
 
                 return () => {
-                    this._refreshProvider = null;
+                    delete this._refreshProviderCollection[providerWrapperId];
                 };
             }, [stateKey]);
 
@@ -67,9 +60,7 @@ class GlobalState<State> {
             this._state = { ...this._state, ...(stateUpdate as Partial<State>) };
         }
 
-        if (this._refreshProvider) {
-            await this._refreshProvider();
-        }
+        await Promise.all(Object.values(this._refreshProviderCollection).map(refreshProvider => refreshProvider()))
     }
 }
 
