@@ -1,9 +1,9 @@
 {
   "name": "bai-react-global-state",
-  "version": "0.2.11",
+  "version": "0.3.0",
   "description": "Redux without pain",
-  "main": "./lib/globalState.js",
-  "types": "./lib/globalState.d.ts",
+  "main": "./lib/index.js",
+  "types": "./lib/index.d.ts",
   "peerDependencies": {
     "react": ">=16.3"
   },
@@ -22,11 +22,15 @@
   },
   "devDependencies": {
     "@types/react": "^17.0.2",
+    "@types/uuid": "^9.0.1",
     "react": "^17.0.2",
-    "typescript": "^4.3.5"
+    "typescript": "^4.9.5"
   },
   "scripts": {
     "build": "tsc",
     "deploy": "tsc && npm publish"
+  },
+  "dependencies": {
+    "uuid": "^9.0.0"
   }
 }
