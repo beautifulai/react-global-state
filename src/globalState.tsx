@@ -1,24 +1,12 @@
 import * as React from "react";
 
-import { ProviderNotRenderedError } from "./errors";
+import { OnlyOneProviderAllowedError } from "./errors";
 
-export default class GlobalState<State, ProviderProps extends JSX.IntrinsicAttributes> {
+class GlobalState<State> {
     private _state: State;
     private _reactContext: React.Context<State>;
     private _refreshProvider: (() => void) | null;
-    private _providerProps: ProviderProps | null;
     private _hasProvider: boolean;
-
-    /**
-     * Provider props is *NOT* mutation-safe!
-     */
-    public get providerProps(): ProviderProps {
-        if (this._providerProps === null) {
-            throw new ProviderNotRenderedError("Provider props missing, provider not rendered");
-        }
-
-        return this._providerProps;
-    }
 
     /**
      * State is *NOT* mutation-safe!
@@ -34,29 +22,26 @@ export default class GlobalState<State, ProviderProps extends JSX.IntrinsicAttri
         this._state = initialState;
         this._reactContext = React.createContext(initialState);
         this._refreshProvider = null;
-        this._providerProps = null;
         this._hasProvider = false;
     }
 
-    public withProvider(Component: React.FC<ProviderProps>) {
+    public withProvider(Component: React.FC<JSX.IntrinsicAttributes>) {
         if (this._hasProvider) {
-            throw new Error("Only one provider is allowed");
+            throw new OnlyOneProviderAllowedError("Only one provider is allowed");
         }
 
         this._hasProvider = true;
-        return (props: ProviderProps) => {
+        return (props: JSX.IntrinsicAttributes) => {
             const [stateKey, updateStateKey] = React.useState(0);
 
             // This has to go right on render so it's available for the children
             // using global state on their first mount (before the useEffect is fired)
             this._refreshProvider = () => updateStateKey(stateKey + 1);
-            this._providerProps = props;
 
             React.useEffect(() => {
                 // Only using for correct disposal upon unmount
                 return () => {
                     this._refreshProvider = null;
-                    this._providerProps = null;
                 };
             }, [0]);
 
@@ -65,9 +50,9 @@ export default class GlobalState<State, ProviderProps extends JSX.IntrinsicAttri
         }
     }
 
-    public withState(Component: React.FC<ProviderProps>) {
+    public withState(Component: React.FC<JSX.IntrinsicAttributes>) {
         const { Consumer } = this._reactContext;
-        return (props: ProviderProps) => (<Consumer>{state => <Component {...props} {...state} />}</Consumer>);
+        return (props: JSX.IntrinsicAttributes) => (<Consumer>{state => <Component {...props} {...state} />}</Consumer>);
     }
 
     public updateState(stateUpdate: (((state: State) => State) | Partial<State>)) {
@@ -82,3 +67,5 @@ export default class GlobalState<State, ProviderProps extends JSX.IntrinsicAttri
         }
     }
 }
+
+export default GlobalState;

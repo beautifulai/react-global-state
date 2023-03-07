@@ -1,1 +1,5 @@
-export class ProviderNotRenderedError extends Error { }
+class OnlyOneProviderAllowedError extends Error {};
+
+export {
+    OnlyOneProviderAllowedError
+};
