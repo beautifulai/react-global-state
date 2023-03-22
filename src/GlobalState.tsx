@@ -13,6 +13,10 @@ class GlobalState<State> {
         return this._state;
     }
 
+    public get ContextConsumer() {
+        return this._reactContext.Consumer;
+    }
+
     /**
      * Initial state is *NOT* mutation-safe!
      */
