@@ -13,6 +13,13 @@ class GlobalStateController<State> {
         return this._globalState.state;
     }
 
+    /**
+     * Use only when strictly necessary, prefer withState() instead
+     */
+    public get ContextConsumer() {
+        return this._globalState.ContextConsumer;
+    }
+
     protected _updateState(stateUpdate: (((state: State) => State) | Partial<State>)) {
         return this._globalState.updateState(stateUpdate);
     }
