@@ -6,7 +6,10 @@ class GlobalStateController<State> {
     protected _globalState: GlobalState<State>;
 
     constructor(initialState: State) {
-        this._globalState = new GlobalState<State>(initialState);
+        this._globalState = new GlobalState<State>(
+            initialState,
+            (prevState: State) => this._stateDidUpdate(prevState)
+        );
     }
 
     protected get _state() {
@@ -30,6 +33,12 @@ class GlobalStateController<State> {
 
     public withState(Component: typeof React.Component<any, any>) {
         return this._globalState.withState(Component);
+    }
+
+    /**
+     * Override if needed
+     */
+    protected _stateDidUpdate(prevState: State) {
     }
 }
 
