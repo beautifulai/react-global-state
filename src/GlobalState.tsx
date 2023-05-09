@@ -5,6 +5,7 @@ class GlobalState<State> {
     private _state: State;
     private _reactContext: React.Context<State>;
     private _refreshProviderCollection: Record<string, () => Promise<void>>;
+    private _stateDidUpdate?: (prevState: State) => void;
 
     /**
      * State is *NOT* mutation-safe!
@@ -20,16 +21,17 @@ class GlobalState<State> {
     /**
      * Initial state is *NOT* mutation-safe!
      */
-    constructor(initialState: State) {
+    constructor(initialState: State, stateDidUpdate?: (prevState: State) => void) {
         this._state = initialState;
         this._reactContext = React.createContext(initialState);
         this._refreshProviderCollection = {};
+        this._stateDidUpdate = stateDidUpdate;
     }
 
     public withProvider(Component: typeof React.Component<any, any>) {
         const providerWrapperId = uuid();
 
-        return (props: React.ComponentProps<typeof Component>) => {
+        return React.forwardRef((props: React.ComponentProps<typeof Component>, ref: React.ForwardedRef<typeof Component>) => {
             const [stateKey, updateStateKey] = React.useState(0);
             const stateUpdateResolvers = React.useRef<Array<(() => void)>>([]);
 
@@ -48,16 +50,20 @@ class GlobalState<State> {
             }, [stateKey]);
 
             const { Provider } = this._reactContext;
-            return <Provider value={this._state}><Component {...props} /></Provider>;
-        }
+            return <Provider value={this._state}><Component {...props} ref={ref} /></Provider>;
+        });
     }
 
     public withState(Component: typeof React.Component<any, any>) {
         const { Consumer } = this._reactContext;
-        return (props: React.ComponentProps<typeof Component>) => (<Consumer>{state => <Component {...props} {...state} />}</Consumer>);
+        return React.forwardRef((props: React.ComponentProps<typeof Component>, ref: React.ForwardedRef<typeof Component>) => (
+            <Consumer>{state => <Component {...props} {...state} ref={ref} />}</Consumer>
+        ));
     }
 
     public async updateState(stateUpdate: (((state: State) => State) | Partial<State>)) {
+        const prevState = this._state;
+
         if (typeof stateUpdate === "function") {
             this._state = stateUpdate(this._state);
         } else {
@@ -65,6 +71,10 @@ class GlobalState<State> {
         }
 
         await Promise.all(Object.values(this._refreshProviderCollection).map(refreshProvider => refreshProvider()))
+
+        if (this._stateDidUpdate) {
+            this._stateDidUpdate(prevState);
+        }
     }
 }
 
