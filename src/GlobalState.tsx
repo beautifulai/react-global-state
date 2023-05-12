@@ -57,7 +57,7 @@ class GlobalState<State> {
     public withState(Component: typeof React.Component<any, any>) {
         const { Consumer } = this._reactContext;
         return React.forwardRef((props: React.ComponentProps<typeof Component>, ref: React.ForwardedRef<typeof Component>) => (
-            <Consumer>{state => <Component {...props} {...state} ref={ref} />}</Consumer>
+            <Consumer>{state => <Component {...state} {...props} ref={ref} />}</Consumer>
         ));
     }
 
