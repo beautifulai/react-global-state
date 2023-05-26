@@ -1,6 +1,8 @@
 import * as React from "react";
 import { v4 as uuid } from "uuid";
 
+type BaseComponentType = keyof JSX.IntrinsicElements | React.JSXElementConstructor<any>;
+
 class GlobalState<State> {
     private _state: State;
     private _reactContext: React.Context<State>;
@@ -28,10 +30,10 @@ class GlobalState<State> {
         this._stateDidUpdate = stateDidUpdate;
     }
 
-    public withProvider(Component: typeof React.Component<any, any>) {
+    public withProvider<T extends BaseComponentType>(Component: T) {
         const providerWrapperId = uuid();
 
-        return React.forwardRef((props: React.ComponentProps<typeof Component>, ref: React.ForwardedRef<typeof Component>) => {
+        return React.forwardRef<T, React.ComponentProps<T>>((props, ref) => {
             const [stateKey, updateStateKey] = React.useState(0);
             const stateUpdateResolvers = React.useRef<Array<(() => void)>>([]);
 
@@ -50,14 +52,22 @@ class GlobalState<State> {
             }, [stateKey]);
 
             const { Provider } = this._reactContext;
-            return <Provider value={this._state}><Component {...props} ref={ref} /></Provider>;
+            return (<Provider value={this._state}>
+                {/* @ts-ignore */}
+                <Component {...props} ref={ref} />
+            </Provider>);
         });
     }
 
-    public withState(Component: typeof React.Component<any, any>) {
+    public withState<T extends BaseComponentType>(Component: T) {
         const { Consumer } = this._reactContext;
-        return React.forwardRef((props: React.ComponentProps<typeof Component>, ref: React.ForwardedRef<typeof Component>) => (
-            <Consumer>{state => <Component {...state} {...props} ref={ref} />}</Consumer>
+
+        type WrapperProps = Omit<React.ComponentProps<T>, keyof State> & Partial<State>;
+        return React.forwardRef<T, WrapperProps>((props, ref) => (
+            <Consumer>
+                {/* @ts-ignore */}
+                {state => <Component {...state} {...props} ref={ref} />}
+            </Consumer>
         ));
     }
 
