@@ -1,6 +1,4 @@
-import * as React from "react";
-
-import GlobalState from "./GlobalState";
+import GlobalState, { BaseComponentType } from "./GlobalState";
 
 class GlobalStateController<State> {
     protected _globalState: GlobalState<State>;
@@ -27,12 +25,12 @@ class GlobalStateController<State> {
         return this._globalState.updateState(stateUpdate);
     }
 
-    public withProvider(Component: typeof React.Component<any, any>) {
-        return this._globalState.withProvider(Component);
+    public withProvider<T extends BaseComponentType>(Component: T) {
+        return this._globalState.withProvider<T>(Component);
     }
 
-    public withState(Component: typeof React.Component<any, any>) {
-        return this._globalState.withState(Component);
+    public withState<T extends BaseComponentType>(Component: T) {
+        return this._globalState.withState<T>(Component);
     }
 
     /**
