@@ -1,0 +1,9 @@
+{
+  "short_name": "bai-react-global-state-sample-app",
+  "name": "bai-react-global-state-sample-app",
+  "icons": [],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#000000",
+  "background_color": "#ffffff"
+}
