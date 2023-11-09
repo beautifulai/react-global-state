@@ -5,8 +5,7 @@ export type BaseComponentType = keyof JSX.IntrinsicElements | React.JSXElementCo
 
 class GlobalState<State> {
     private _state: State;
-    private _reactContext: React.Context<State>;
-    private _refreshProviderCollection: Record<string, () => Promise<void>>;
+    private _refreshWrappedComponentCollection: Record<string, () => Promise<void>>;
     private _stateDidUpdate?: (prevState: State) => void;
 
     /**
@@ -16,59 +15,50 @@ class GlobalState<State> {
         return this._state;
     }
 
-    public get ContextConsumer() {
-        return this._reactContext.Consumer;
-    }
-
     /**
      * Initial state is *NOT* mutation-safe!
      */
     constructor(initialState: State, stateDidUpdate?: (prevState: State) => void) {
         this._state = initialState;
-        this._reactContext = React.createContext(initialState);
-        this._refreshProviderCollection = {};
+        this._refreshWrappedComponentCollection = {};
         this._stateDidUpdate = stateDidUpdate;
     }
 
-    public withProvider<T extends BaseComponentType>(Component: T) {
-        const providerWrapperId = uuid();
-
-        return React.forwardRef<T, React.ComponentProps<T>>((props, ref) => {
-            const [stateKey, updateStateKey] = React.useState(0);
-            const stateUpdateResolvers = React.useRef<Array<(() => void)>>([]);
-
-            React.useEffect(() => {
-                stateUpdateResolvers.current.forEach(resolve => resolve());
-                stateUpdateResolvers.current = [];
-
-                this._refreshProviderCollection[providerWrapperId] = () => new Promise(resolve => {
-                    stateUpdateResolvers.current.push(resolve);
-                    updateStateKey(stateKey + 1);
-                });
-
-                return () => {
-                    delete this._refreshProviderCollection[providerWrapperId];
-                };
-            }, [stateKey]);
-
-            const { Provider } = this._reactContext;
-            return (<Provider value={this._state}>
-                {/* @ts-ignore */}
-                <Component {...props} ref={ref} />
-            </Provider>);
-        });
-    }
-
     public withState<T extends BaseComponentType>(Component: T) {
-        const { Consumer } = this._reactContext;
+        const globalState = this;
 
-        type WrapperProps = Omit<React.ComponentProps<T>, keyof State> & Partial<State>;
-        return React.forwardRef<T, WrapperProps>((props, ref) => (
-            <Consumer>
-                {/* @ts-ignore */}
-                {state => <Component {...state} {...props} ref={ref} />}
-            </Consumer>
-        ));
+        type WrapperProps = Omit<React.ComponentProps<T>, keyof State> & Partial<State> & { forwardedRef?: React.Ref<any> };
+        class WrappedComponent extends React.Component<WrapperProps, { stateKey: number }> {
+            private _id: string;
+
+            constructor(props: WrapperProps) {
+                super(props);
+
+                this._id = uuid();
+
+                this.state = {
+                    stateKey: 0
+                };                
+            }
+
+            componentDidMount() {
+                globalState._refreshWrappedComponentCollection[this._id] = () => new Promise(resolve => {
+                    this.setState({ stateKey: this.state.stateKey + 1 }, resolve);
+                });
+            }
+
+            componentWillUnmount() {
+                delete globalState._refreshWrappedComponentCollection[this._id];
+            }
+
+            render() {
+                const { forwardedRef, ...props } = this.props;
+                // @ts-ignore
+                return <Component {...globalState._state} {...props} ref={forwardedRef} />;
+            }
+        }
+
+        return React.forwardRef<T, WrapperProps>((props, ref) => <WrappedComponent {...props} forwardedRef={ref} />);
     }
 
     public async updateState(stateUpdate: (((state: State) => State) | Partial<State>)) {
@@ -80,7 +70,7 @@ class GlobalState<State> {
             this._state = { ...this._state, ...(stateUpdate as Partial<State>) };
         }
 
-        await Promise.all(Object.values(this._refreshProviderCollection).map(refreshProvider => refreshProvider()))
+        await Promise.all(Object.values(this._refreshWrappedComponentCollection).map(refreshComponent => refreshComponent()))
 
         if (this._stateDidUpdate) {
             this._stateDidUpdate(prevState);
