@@ -1,6 +1,6 @@
 {
   "name": "bai-react-global-state",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "Redux without pain",
   "main": "./lib/index.js",
   "types": "./lib/index.d.ts",

@@ -38,7 +38,7 @@ class GlobalState<State> {
 
                 this.state = {
                     stateKey: 0
-                };                
+                };
             }
 
             componentDidMount() {
@@ -70,7 +70,17 @@ class GlobalState<State> {
             this._state = { ...this._state, ...(stateUpdate as Partial<State>) };
         }
 
-        await Promise.all(Object.values(this._refreshWrappedComponentCollection).map(refreshComponent => refreshComponent()))
+        // Refreshing sequentially because some refreshes may cause new components to be mounted or existing components to be unmounted
+        const refreshedComponentIds: string[] = [];
+        while (true) {
+            const refreshComponentId = Object.keys(this._refreshWrappedComponentCollection).find(id => !refreshedComponentIds.includes(id));
+            if (!refreshComponentId) {
+                break;
+            }
+
+            refreshedComponentIds.push(refreshComponentId);
+            await this._refreshWrappedComponentCollection[refreshComponentId]();
+        }
 
         if (this._stateDidUpdate) {
             this._stateDidUpdate(prevState);
