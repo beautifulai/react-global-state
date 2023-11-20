@@ -11,7 +11,7 @@ import { Button, Intent, Card, Spinner, Tag } from "@blueprintjs/core";
 // and wraps state and state provider/consumer
 import { GlobalStateController } from "bai-react-global-state";
 
-// Dumm styling, ignore
+// Dummy styling, ignore
 const AppContainer = styled.div`
     display: flex;
     flex-direction: column;
@@ -119,7 +119,7 @@ const CounterControls =
     // State injection
     appStateController.withState(
         // Component itself
-        function CounterControls({ fetching, intent }: CounterControlsProps) {
+        function CounterControls({ fetching, intent, counter }: CounterControlsProps) {
             return (<Button
                 loading={fetching}
                 intent={intent}
@@ -129,6 +129,8 @@ const CounterControls =
                 text="Increment"
             />);
         }
-    )
+        // We can specify which state keys we want the component to receive,
+        // so its props don't get polluted with the full state
+        , ["fetching"])
 
 export default App;
