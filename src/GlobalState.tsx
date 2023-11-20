@@ -1,7 +1,8 @@
 import * as React from "react";
 import { v4 as uuid } from "uuid";
 
-export type BaseComponentType = keyof JSX.IntrinsicElements | React.JSXElementConstructor<any>;
+export type BaseComponentType = React.ComponentType<any>;
+export type WrapperProps<T extends BaseComponentType, S> = Omit<React.ComponentProps<T>, keyof S> & Partial<S>;
 
 class GlobalState<State> {
     private _state: State;
@@ -24,14 +25,13 @@ class GlobalState<State> {
         this._stateDidUpdate = stateDidUpdate;
     }
 
-    public withState<T extends BaseComponentType>(Component: T) {
+    public withState<T extends BaseComponentType>(Component: T, stateKeys?: [keyof State, ...(keyof State)[]]) {
         const globalState = this;
 
-        type WrapperProps = Omit<React.ComponentProps<T>, keyof State> & Partial<State> & { forwardedRef?: React.Ref<any> };
-        class WrappedComponent extends React.Component<WrapperProps, { stateKey: number }> {
+        class WrappedComponent extends React.Component<WrapperProps<T, State> & { forwardedRef?: React.Ref<any> }, { stateKey: number }> {
             private _id: string;
 
-            constructor(props: WrapperProps) {
+            constructor(props: WrapperProps<T, State>) {
                 super(props);
 
                 this._id = uuid();
@@ -43,6 +43,8 @@ class GlobalState<State> {
 
             componentDidMount() {
                 globalState._refreshWrappedComponentCollection[this._id] = () => new Promise(resolve => {
+                    // No need to ensure stateKey being always incremented correctly, we only need to ensure 
+                    // React refreshes the component
                     this.setState({ stateKey: this.state.stateKey + 1 }, resolve);
                 });
             }
@@ -53,14 +55,24 @@ class GlobalState<State> {
 
             render() {
                 const { forwardedRef, ...props } = this.props;
+
+                // If stateKeys are specified, only pass those keys to the wrapped component
+                const stateProps = stateKeys
+                    ? stateKeys.reduce((state, key) => ({ ...state, [key]: globalState._state[key] }), {})
+                    : globalState._state;
+
+                // Ignoring since we're not enforcing the wrappeed component props type
                 // @ts-ignore
-                return <Component {...globalState._state} {...props} ref={forwardedRef} />;
+                return <Component {...stateProps} {...props} ref={forwardedRef} />;
             }
         }
 
-        return React.forwardRef<T, WrapperProps>((props, ref) => <WrappedComponent {...props} forwardedRef={ref} />);
+        return React.forwardRef<T, WrapperProps<T, State>>((props, ref) => <WrappedComponent {...props} forwardedRef={ref} />);
     }
 
+    /**
+     * State and state updates are *NOT* mutation-safe!
+     */
     public async updateState(stateUpdate: (((state: State) => State) | Partial<State>)) {
         const prevState = this._state;
 
