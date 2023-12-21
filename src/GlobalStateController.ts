@@ -6,6 +6,7 @@ class GlobalStateController<State> {
     constructor(initialState: State) {
         this._globalState = new GlobalState<State>(
             initialState,
+            (nextState: State) => this._stateWillUpdate(nextState),
             (prevState: State) => this._stateDidUpdate(prevState)
         );
     }
@@ -26,6 +27,13 @@ class GlobalStateController<State> {
      * Override if needed
      */
     protected _stateDidUpdate(prevState: State) {
+    }
+
+    /**
+     * Override if needed, must return next state
+     */
+    protected _stateWillUpdate(nextState: State) {
+        return nextState;
     }
 }
 
