@@ -7,6 +7,7 @@ export type WrapperProps<T extends BaseComponentType, S> = Omit<React.ComponentP
 class GlobalState<State> {
     private _state: State;
     private _refreshWrappedComponentCollection: Record<string, () => Promise<void>>;
+    private _stateWillUpdate?: (nextState: State) => State;
     private _stateDidUpdate?: (prevState: State) => void;
 
     /**
@@ -19,9 +20,14 @@ class GlobalState<State> {
     /**
      * Initial state is *NOT* mutation-safe!
      */
-    constructor(initialState: State, stateDidUpdate?: (prevState: State) => void) {
+    constructor(
+        initialState: State,
+        stateWillUpdate?: (nextState: State) => State,
+        stateDidUpdate?: (prevState: State) => void
+    ) {
         this._state = initialState;
         this._refreshWrappedComponentCollection = {};
+        this._stateWillUpdate = stateWillUpdate;
         this._stateDidUpdate = stateDidUpdate;
     }
 
@@ -76,11 +82,21 @@ class GlobalState<State> {
     public async updateState(stateUpdate: (((state: State) => State) | Partial<State>)) {
         const prevState = this._state;
 
+        let nextState: State;
         if (typeof stateUpdate === "function") {
-            this._state = stateUpdate(this._state);
+            nextState = stateUpdate(this._state);
         } else {
-            this._state = { ...this._state, ...(stateUpdate as Partial<State>) };
+            nextState = { ...this._state, ...(stateUpdate as Partial<State>) };
         }
+
+        if (this._stateWillUpdate) {
+            nextState = this._stateWillUpdate(nextState);
+            if (!nextState) {
+                throw new Error("State will update hook must return next state");
+            }
+        }
+
+        this._state = nextState;
 
         // Refreshing sequentially because some refreshes may cause new components to be mounted or existing components to be unmounted
         const refreshedComponentIds: string[] = [];
