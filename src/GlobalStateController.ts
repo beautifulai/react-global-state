@@ -19,6 +19,10 @@ class GlobalStateController<State> {
         return this._globalState.updateState(stateUpdate);
     }
 
+    public withProvider<T extends BaseComponentType>(Component: T) {
+        return this._globalState.withProvider<T>(Component);
+    }
+
     public withState<T extends BaseComponentType>(Component: T, stateKeys?: [keyof State, ...(keyof State)[]]) {
         return this._globalState.withState<T>(Component, stateKeys);
     }
