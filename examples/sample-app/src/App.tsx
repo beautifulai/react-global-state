@@ -77,24 +77,28 @@ const appStateController = new AppStateController(initialState);
 // ↓↓↓↓↓↓↓ REACT COMPONENTS ↓↓↓↓↓↓↓
 
 // Main app component
-function App() {
-    useEffect(() => {
-        // Initilzing controller on mount
-        appStateController.initialize()
-            .catch(console.error);
-    }, []);
+const App =
+    // Provider injection
+    appStateController.withProvider(
+        function App() {
+            useEffect(() => {
+                // Initilzing controller on mount
+                appStateController.initialize()
+                    .catch(console.error);
+            }, []);
 
-    return (<AppContainer>
-        <Card>
-            {/* Being declarative here, no need to pass app state down the tree */}
-            <Counter />
-            {/* Note that along with the app state components may be able to receive additional props */}
-            {/* In this case the component's props interface just extends AppState, refer to CounterControls definition below */}
-            <CounterControls intent={Intent.SUCCESS} />
-        </Card>
-    </AppContainer>
+            return (<AppContainer>
+                <Card>
+                    {/* Being declarative here, no need to pass app state down the tree */}
+                    <Counter />
+                    {/* Note that along with the app state components may be able to receive additional props */}
+                    {/* In this case the component's props interface just extends AppState, refer to CounterControls definition below */}
+                    <CounterControls intent={Intent.SUCCESS} />
+                </Card>
+            </AppContainer>
+            );
+        }
     );
-}
 
 const Counter =
     // State injection
@@ -119,7 +123,7 @@ const CounterControls =
     // State injection
     appStateController.withState(
         // Component itself
-        function CounterControls({ fetching, intent, counter }: CounterControlsProps) {
+        function CounterControls({ fetching, intent }: CounterControlsProps) {
             return (<Button
                 loading={fetching}
                 intent={intent}
