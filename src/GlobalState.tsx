@@ -9,12 +9,30 @@ type ProviderInjectorState = {
     providerId: string
 }
 
+export type GlobalStateStats = {
+    componentsInjectingProviderCount: number,
+    componentsWithInjectedStateCount: number
+}
+
+export type GlobalStateDebugProps = {
+    __gs_providerInjectorState: ProviderInjectorState
+    __gs_injectsProvider: boolean
+}
+
 class GlobalState<State> {
     private _reactContext: React.Context<ProviderInjectorState | null>;
     private _state: State;
     private _refreshProviderInjectorCollection: Record<string, () => Promise<void>>;
     private _stateWillUpdate?: (nextState: State) => State;
     private _stateDidUpdate?: (prevState: State) => void;
+    private _componentsWithInjectedStateCollection: Record<string, string>;
+
+    public get stats(): GlobalStateStats {
+        return {
+            componentsInjectingProviderCount: Object.keys(this._refreshProviderInjectorCollection).length,
+            componentsWithInjectedStateCount: Object.keys(this._componentsWithInjectedStateCollection).length
+        }
+    }
 
     /**
      * State is *NOT* mutation-safe!
@@ -36,13 +54,32 @@ class GlobalState<State> {
         this._refreshProviderInjectorCollection = {};
         this._stateWillUpdate = stateWillUpdate;
         this._stateDidUpdate = stateDidUpdate;
+        this._componentsWithInjectedStateCollection = {};
     }
 
-    public withProvider<T extends BaseComponentType>(Component: T) {
+    public withState<T extends BaseComponentType>(Component: T, stateKeys?: [keyof State, ...(keyof State)[]]) {
         const globalState = this;
+        const { Consumer, Provider } = this._reactContext;
 
-        type ProviderInjectorProps = React.ComponentProps<T> & { forwardedRef?: React.Ref<any> };
-        class ProviderWrapper extends React.Component<ProviderInjectorProps, ProviderInjectorState> {
+        type ComponentWrapperProps = WrapperProps<T, State> & GlobalStateDebugProps & { componentRef?: React.Ref<any> };
+        function ComponentWrapper({ componentRef, __gs_injectsProvider, __gs_providerInjectorState, ...props }: ComponentWrapperProps) {
+            const stateProps: Partial<State> = stateKeys
+                ? stateKeys.reduce((_state, key) => ({ ..._state, [key]: globalState._state[key] }), {})
+                : globalState._state;
+
+            // Ignoring since we're not enforcing the wrappeed component props type
+            // @ts-ignore
+            return (<Component
+                {...stateProps}
+                {...props}
+                __gs_providerInjectorState={__gs_providerInjectorState}
+                __gs_injectsProvider={__gs_injectsProvider}
+                ref={componentRef}
+            />)
+        }
+
+        type ProviderInjectorProps = WrapperProps<T, State> & { componentRef?: React.Ref<any> };
+        class ProviderInjector extends React.Component<ProviderInjectorProps, ProviderInjectorState> {
             constructor(props: ProviderInjectorProps) {
                 super(props);
 
@@ -65,60 +102,43 @@ class GlobalState<State> {
             }
 
             render() {
-                const { forwardedRef, ...props } = this.props;
-
-                const { Provider } = globalState._reactContext;
                 return (<Provider value={this.state}>
-                    {/* @ts-ignore */}
-                    <Component {...props} ref={forwardedRef} />
+                    <ComponentWrapper
+                        {...this.props}
+                        __gs_injectsProvider={true}
+                        __gs_providerInjectorState={this.state}
+                    />
                 </Provider>);
             }
         }
 
-        const { Consumer } = this._reactContext;
-        return React.forwardRef<T, React.ComponentProps<T>>((props, ref) =>
-            // Sniffing if the component is already wrapped with the provider
-            <Consumer>
-                {providerState => {
-                    if (providerState) {
-                        console.warn(`Component ${Component.name ?? "anonymous"} is already wrapped with the provider ${providerState.providerId}, will omit provider injection, please remove the redundant wrapping`);
-                        // @ts-ignore
-                        return <Component {...props} ref={ref} />;
-                    }
+        return React.forwardRef<T, WrapperProps<T, State>>((props, ref) => {
+            React.useEffect(() => {
+                const componentId = uuid();
 
-                    return <ProviderWrapper {...props} forwardedRef={ref} />;
-                }}
-            </Consumer>
-        );
-    }
+                globalState._componentsWithInjectedStateCollection[componentId] = Component.displayName ?? Component.name ?? "AnonymousComponent";
 
-    public withState<T extends BaseComponentType>(Component: T, stateKeys?: [keyof State, ...(keyof State)[]]) {
-        const { Consumer } = this._reactContext;
+                return () => {
+                    delete globalState._componentsWithInjectedStateCollection[componentId];
+                };
+            }, []);
 
-        return React.forwardRef<T, WrapperProps<T, State>>((props, ref) => (
-            <Consumer>
+            return (<Consumer>
                 {providerState => {
                     if (providerState === null) {
-                        throw new Error(`No state provided for component ${Component.name ?? "anonymous"}, make sure the component is wrapped with the correct provider`);
+                        // No provider has been injected above this component, so we need to inject one
+                        return <ProviderInjector {...props} componentRef={ref} />;
                     }
 
-                    // If stateKeys are specified, only pass those keys to the wrapped component
-                    const stateProps = stateKeys
-                        ? stateKeys.reduce((_state, key) => ({ ..._state, [key]: this._state[key] }), {})
-                        : this._state;
-
-                    // Ignoring since we're not enforcing the wrappeed component props type
-                    // @ts-ignore
-                    return <Component
-                        {...stateProps}
+                    return (<ComponentWrapper
                         {...props}
-                        // Can be used for debugging purposes
-                        __providerState={providerState.stateKey}
-                        ref={ref}
-                    />;
+                        componentRef={ref}
+                        __gs_injectsProvider={false}
+                        __gs_providerInjectorState={providerState}
+                    />);
                 }}
-            </Consumer>
-        ));
+            </Consumer>);
+        });
     }
 
     /**

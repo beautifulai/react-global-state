@@ -15,12 +15,12 @@ class GlobalStateController<State> {
         return this._globalState.state;
     }
 
-    protected _updateState(stateUpdate: (((state: State) => State) | Partial<State>)) {
-        return this._globalState.updateState(stateUpdate);
+    public get globalStateStats() {
+        return this._globalState.stats;
     }
 
-    public withProvider<T extends BaseComponentType>(Component: T) {
-        return this._globalState.withProvider<T>(Component);
+    protected _updateState(stateUpdate: (((state: State) => State) | Partial<State>)) {
+        return this._globalState.updateState(stateUpdate);
     }
 
     public withState<T extends BaseComponentType>(Component: T, stateKeys?: [keyof State, ...(keyof State)[]]) {
