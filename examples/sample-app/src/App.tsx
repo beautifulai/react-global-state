@@ -26,6 +26,20 @@ const AppContainer = styled.div`
         gap: 15px;
         width: 200px;
     }
+    
+    >pre {
+        margin: 0;
+        font-size: 10px;
+        background: whitesmoke;
+        padding: 10px;
+        border-radius: 10px;
+    }
+
+    >span {
+        font-size: 10px;
+        margin-top: 10px;
+        color: gray;
+    }
 `;
 
 // ↓↓↓↓↓↓↓ GLOBAL STATE AND CONTROLLER ↓↓↓↓↓↓↓
@@ -78,9 +92,9 @@ const appStateController = new AppStateController(initialState);
 
 // Main app component
 const App =
-    // Provider injection
-    appStateController.withProvider(
-        function App() {
+    // State injection
+    appStateController.withState(
+        function App(state: AppState) {
             useEffect(() => {
                 // Initilzing controller on mount
                 appStateController.initialize()
@@ -95,6 +109,10 @@ const App =
                     {/* In this case the component's props interface just extends AppState, refer to CounterControls definition below */}
                     <CounterControls intent={Intent.SUCCESS} />
                 </Card>
+                <span>Raw global state (including the debugging props sent down to the App component)</span>
+                <pre>{JSON.stringify(state, null, 2)}</pre>
+                <span>Global state stats</span>
+                <pre>{JSON.stringify(appStateController.globalStateStats, null, 2)}</pre>
             </AppContainer>
             );
         }
